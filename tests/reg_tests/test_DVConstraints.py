@@ -643,7 +643,16 @@ class RegTestPyGeo(unittest.TestCase):
                 name="ToC-2D-Unscaled", leList=leList, teList=teList, nSpan=nSpan, nChord=nChord, scaled=False
             )
             DVCon.addThicknessToChordConstraints2D(
-                name="ToCMax-2D",
+                name="ToCMax-2D-Scaled",
+                leList=leList,
+                teList=teList,
+                nSpan=nSpan,
+                nChord=nChord,
+                scaled=True,
+                sectionMax=True,
+            )
+            DVCon.addThicknessToChordConstraints2D(
+                name="ToCMax-2D-Unscaled",
                 leList=leList,
                 teList=teList,
                 nSpan=nSpan,
