@@ -225,38 +225,22 @@ class OM_DVGEOCOMP(om.ExplicitComponent):
             self.add_input(inputName, distributed=True, val=points.flatten())
             self.add_output(outputName, distributed=True, val=points.flatten())
 
-    def nom_addPointSet(self, points, ptName, add_output=True, DVGeoName=None, distributed=True, **kwargs):
-        """Add a pointset to the DVGeo object and create an output for it in the OpenMDAO component.
-
-        Parameters
-        ----------
-        points : numpy array
-            3D points to add to the DVGeo object, shape (N,3) or (3N,)
-        ptName : str
-            Name for the pointset
-        add_output : bool, optional
-            Whether to add the deformed points as an output of the component, by default True
-        DVGeoName : str, optional
-            The name of the DVGeo to add the points to, necessary if there are multiple DVGeo objects. By default `None`.
-        distributed : bool, optional
-            Whether the output of the component should be a distributed variable, by default True
-
-        Returns
-        -------
-        None or float
-            If using DVGeometryESP or DVGeometryVSP, returns the maximum distance between pointset and the CAD model
-        """
+    def nom_addPointSet(self, points, ptName, add_output=True, DVGeoName=None, **kwargs):
         # if we have multiple DVGeos use the one specified by name
         DVGeo = self.nom_getDVGeo(DVGeoName=DVGeoName)
 
         # add the points to the dvgeo object
-        # DVGeoESP and DVGeoVSP can return a value to check the pointset distribution
-        dMaxGlobal = DVGeo.addPointSet(points.reshape(-1, 3), ptName, **kwargs)
+        dMaxGlobal = None
+        if isinstance(DVGeo, DVGeometryESP):
+            # DVGeoESP can return a value to check the pointset distribution
+            dMaxGlobal = DVGeo.addPointSet(points.reshape(len(points) // 3, 3), ptName, **kwargs)
+        else:
+            DVGeo.addPointSet(points.reshape(len(points) // 3, 3), ptName, **kwargs)
         self.omPtSetList.append(ptName)
 
         if add_output:
             # add an output to the om component
-            self.add_output(ptName, distributed=distributed, val=points.flatten())
+            self.add_output(ptName, distributed=True, val=points.flatten())
 
         return dMaxGlobal
 
@@ -285,12 +269,6 @@ class OM_DVGEOCOMP(om.ExplicitComponent):
         DVGeometry object
             DVGeometry object held by this geometry component
         """
-        # Calling this function before setup is not allowed because the DVGeo object(s) do not exist yet
-        if not hasattr(self, "DVGeos"):
-            raise RuntimeError(
-                "Cannot call `nom_getDVGeo` before OM_DVGEOCOMP's `setup` method has been called. If you are calling this function in the `setup` method of a group containing an OM_DVGEOCOMP, move the call to `configure` instead."
-            ) from None
-
         # if we have multiple DVGeos use the one specified by name
         if self.multDVGeo:
             DVGeo = self.DVGeos[DVGeoName]
@@ -783,6 +761,38 @@ class OM_DVGEOCOMP(om.ExplicitComponent):
             projected=projected,
         )
         self.add_output(name, distributed=False, val=np.ones(nCon), shape=nCon)
+
+    def nom_addThicknessToChordConstraints1D(self, name, ptList, leList, teList, nCon, **kwargs):
+        """
+        Add a DVCon thickness to chord constraint to the problem
+        Wrapper for :meth:`addThicknessToChordConstraints1D <.DVConstraints.addThicknessToChordConstraints1D>`
+        Input parameters are identical to those in wrapped function unless otherwise specified
+        """
+        con = self.DVCon.addThicknessToChordConstraints1D(
+            ptList,
+            leList,
+            teList,
+            nCon,
+            name=name,
+            **kwargs,
+        )
+        self.add_output(name, distributed=False, val=np.ones(con.nCon), shape=con.nCon)
+
+    def nom_addThicknessToChordConstraints2D(self, name, leList, teList, nSpan, nChord, **kwargs):
+        """
+        Add a DVCon thickness to chord constraint to the problem
+        Wrapper for :meth:`addThicknessToChordConstraints2D <.DVConstraints.addThicknessToChordConstraints2D>`
+        Input parameters are identical to those in wrapped function unless otherwise specified
+        """
+        con = self.DVCon.addThicknessToChordConstraints2D(
+            leList,
+            teList,
+            nSpan,
+            nChord,
+            name=name,
+            **kwargs,
+        )
+        self.add_output(name, distributed=False, val=np.ones(con.nCon), shape=con.nCon)
 
     def nom_addVolumeConstraint(
         self,
